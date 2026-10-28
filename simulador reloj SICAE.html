@@ -22,7 +22,6 @@
 </head>
 <body>
 <div class="mx-auto max-w-md h-[100dvh] flex flex-col bg-slate-50 relative overflow-hidden sm:shadow-2xl">
-
   <header class="bg-[#0a2540] text-white px-4 pb-3 pt-[max(12px,env(safe-area-inset-top))] shrink-0">
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2.5">
@@ -38,26 +37,21 @@
       </div>
     </div>
   </header>
-
   <div id="banner" class="absolute top-2 inset-x-3 z-30 pointer-events-none"></div>
   <main id="view" class="flex-1 overflow-y-auto p-4"></main>
-
   <nav class="shrink-0 bg-white border-t border-slate-200 flex pb-[env(safe-area-inset-bottom)]">
     <button data-tab="notif" onclick="setTab('notif')" class="tab flex-1 py-2.5 flex flex-col items-center gap-1 text-[10px] font-semibold relative"><i class="fa-solid fa-bell text-base"></i>Notificaciones<span id="unread" class="hidden absolute top-1.5 left-1/2 ml-2 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] items-center justify-center"></span></button>
     <button data-tab="asist" onclick="setTab('asist')" class="tab flex-1 py-2.5 flex flex-col items-center gap-1 text-[10px] font-semibold"><i class="fa-solid fa-calendar-check text-base"></i>Asistencias</button>
     <button data-tab="inst" onclick="setTab('inst')" class="tab flex-1 py-2.5 flex flex-col items-center gap-1 text-[10px] font-semibold"><i class="fa-solid fa-building-columns text-base"></i>Institución</button>
   </nav>
 </div>
-
 <script>
 // Mismas claves y canal que simuladorapp.html
 const K_EV='sicae_attendance_events_v1', K_ST='sicae_students_state_v1', CH='sicae_biometric_network_v1', K_LINK='sicae_parent_linked_v1';
 let students=[], events=[], linked=null, tab='notif', unread=0, lastSeen=null, sound=true, ctx=null;
-
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const get=k=>{try{const r=localStorage.getItem(k);return r?JSON.parse(r):null}catch(e){return null}};
 const set=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
-
 function load(){
   const s=get(K_ST); if(Array.isArray(s)) students=s;
   const e=get(K_EV); if(Array.isArray(e)) events=e;
@@ -65,7 +59,6 @@ function load(){
 }
 const myEvents=()=>events.filter(e=>linked&&linked.includes(e.studentId));
 const myStudents=()=>students.filter(s=>linked&&linked.includes(s.id));
-
 // ---------- Sonido, vibración y notificación del sistema ----------
 function beep(entry){
   if(!sound) return;
@@ -83,7 +76,6 @@ function beep(entry){
 }
 function toggleSound(){sound=!sound;document.getElementById('snd').className='fa-solid '+(sound?'fa-volume-high text-sky-300':'fa-volume-xmark text-slate-400')+' text-xs'}
 function askPerm(){ if('Notification' in window) Notification.requestPermission().then(render) }
-
 function notify(ev){
   const entry=ev.eventType==='ENTRADA';
   const title=entry?'✅ Ingreso registrado':'🚪 Salida registrada';
@@ -100,7 +92,6 @@ function notify(ev){
       <p class="text-[11px] text-slate-600 mt-0.5 leading-snug">${esc(body)}</p>
     </div>`;
 }
-
 // ---------- Recepción desde el reloj biométrico ----------
 function incoming(explicit){
   load();
@@ -117,7 +108,6 @@ function incoming(explicit){
 let bc=null;
 try{ if('BroadcastChannel' in window){ bc=new BroadcastChannel(CH); bc.onmessage=m=>{ if(m.data&&m.data.type==='STATE_UPDATED') incoming(m.data.event||null) } } }catch(e){}
 window.addEventListener('storage',e=>{ if(e.key===K_EV||e.key===K_ST) incoming() });
-
 // ---------- Vinculación ----------
 function saveLinks(){
   const ids=[...document.querySelectorAll('.lk:checked')].map(c=>c.value);
@@ -125,7 +115,6 @@ function saveLinks(){
   linked=ids; set(K_LINK,ids); tab='notif'; render();
 }
 function relink(){linked=null;render()}
-
 // ---------- Prueba local (equivale al botón del simulador original) ----------
 function testScan(){
   load(); const stu=myStudents()[0]; if(!stu) return;
@@ -141,10 +130,8 @@ function testScan(){
   try{bc&&bc.postMessage({type:'STATE_UPDATED',event:ev,timestamp:Date.now()})}catch(e){}
   incoming(ev);
 }
-
 // ---------- Vistas ----------
 function setTab(t){tab=t;if(t==='notif')unread=0;render()}
-
 const pill=(inside)=>`<span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${inside?'bg-emerald-100 text-emerald-800 border border-emerald-200':'bg-slate-100 text-slate-600 border border-slate-200'}">${inside?'● En el centro':'○ Fuera del centro'}</span>`;
 const card=(s)=>`<div class="bg-white border ${s.status==='INSIDE'?'border-emerald-200':'border-slate-200'} rounded-2xl p-3.5 shadow-sm flex items-center justify-between gap-2">
   <div class="flex items-center gap-2.5 min-w-0">
@@ -166,7 +153,6 @@ function viewLink(){
       <div class="min-w-0"><div class="text-xs font-bold text-slate-900 truncate">${esc(s.name)}</div><div class="text-[11px] text-slate-500 truncate">Tutor: ${esc(s.parentName)}</div></div></label>`).join('')}</div>
     <button onclick="saveLinks()" class="mt-4 w-full py-3 rounded-2xl bg-[#0a2540] text-white text-xs font-semibold">Continuar</button>`;
 }
-
 function viewNotif(){
   const ev=myEvents(), perm='Notification' in window?Notification.permission:'unsupported';
   let h='';
@@ -189,7 +175,6 @@ function viewNotif(){
         <span><i class="fa-solid fa-fingerprint text-sky-600 mr-1"></i>${esc(e.deviceNode||'Hub K14')}</span>
         <span class="text-emerald-600 font-medium"><i class="fa-solid fa-check-double mr-1"></i>Verificado</span></div></div>`}).join('')}</div>`;
 }
-
 function viewAsist(){
   const ev=myEvents(); const inside=myStudents().filter(s=>s.status==='INSIDE').length;
   let h=`<div class="grid grid-cols-2 gap-3 mb-4">
@@ -205,7 +190,6 @@ function viewAsist(){
       <div class="text-[10px] fm text-slate-400 truncate">${esc(e.eventType)} • ${esc(e.biometricHash)}</div></div></div>
       <div class="fm text-sm font-bold text-slate-900">${esc(e.timeFormatted)}</div></div>`}).join('')+`</div>`).join('');
 }
-
 function viewInst(){
   const perm='Notification' in window?Notification.permission:'no disponible';
   return `<div class="bg-white border border-slate-200 rounded-2xl p-4 mb-3">
@@ -224,14 +208,12 @@ function viewInst(){
       ${perm==='denied'?`<p class="text-[11px] text-rose-600">Bloqueadas: actívalas desde los ajustes del navegador.</p>`:''}</div>
     <button onclick="testScan()" class="w-full py-3 rounded-2xl bg-[#0a2540] text-white text-xs font-semibold"><i class="fa-solid fa-fingerprint text-sky-400 mr-2"></i>Simular huella de prueba</button>`;
 }
-
 function render(){
   document.querySelectorAll('.tab').forEach(b=>{const on=b.dataset.tab===tab&&linked;b.className=b.className.replace(/text-\S+/g,'')+' '+(on?'text-sky-700':'text-slate-400')});
   const u=document.getElementById('unread'); u.textContent=unread; u.classList.toggle('hidden',!unread); u.classList.toggle('flex',!!unread);
   const v=document.getElementById('view');
   v.innerHTML=!linked?viewLink():tab==='notif'?viewNotif():tab==='asist'?viewAsist():viewInst();
 }
-
 window.addEventListener('DOMContentLoaded',()=>{ load(); if(events[0]) lastSeen=events[0].id; render(); });
 </script>
 </body>
