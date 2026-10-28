@@ -222,7 +222,7 @@ function viewInst(){
       <div class="text-[11px] text-slate-500 mb-3">Estado: <strong>${esc(perm)}</strong></div>
       ${perm==='default'?`<button onclick="askPerm()" class="w-full py-2.5 rounded-xl bg-sky-600 text-white text-xs font-semibold">Activar notificaciones</button>`:''}
       ${perm==='denied'?`<p class="text-[11px] text-rose-600">Bloqueadas: actívalas desde los ajustes del navegador.</p>`:''}</div>
-    <button onclick="testScan()" class="w-full py-3 rounded-2xl bg-[#0a2540] text-white text-xs font-semibold">`;
+    <button onclick="testScan()" class="w-full py-3 rounded-2xl bg-[#0a2540] text-white text-xs font-semibold"><i class="fa-solid fa-fingerprint text-sky-400 mr-2"></i>Simular huella de prueba</button>`;
 }
 
 function render(){
