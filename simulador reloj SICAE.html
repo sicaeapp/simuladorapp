@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a2540">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>S.I.C.A.E. Parent Connect</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  body{font-family:'Inter',sans-serif;background:#e2e8f0;overscroll-behavior:none}
+  .fd{font-family:'Plus Jakarta Sans',sans-serif}.fm{font-family:'JetBrains Mono',monospace}
+  @keyframes slide{0%{transform:translateY(-140%);opacity:0}10%,88%{transform:translateY(0);opacity:1}100%{transform:translateY(-140%);opacity:0}}
+  .banner{animation:slide 5s cubic-bezier(.16,1,.3,1) forwards}
+  @keyframes flash{0%{box-shadow:0 0 0 0 rgba(2,132,199,.45)}100%{box-shadow:0 0 0 14px rgba(2,132,199,0)}}
+  .flash{animation:flash 1.4s ease-out}
+  main::-webkit-scrollbar{width:0}
+</style>
+</head>
+<body>
+<div class="mx-auto max-w-md h-[100dvh] flex flex-col bg-slate-50 relative overflow-hidden sm:shadow-2xl">
+
+  <header class="bg-[#0a2540] text-white px-4 pb-3 pt-[max(12px,env(safe-area-inset-top))] shrink-0">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-sky-300"><i class="fa-solid fa-shield-heart"></i></div>
+        <div>
+          <div class="text-[10px] font-medium text-sky-300 uppercase tracking-wider">S.I.C.A.E. Familias</div>
+          <h1 class="fd text-sm font-bold">Parent Connect</h1>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="conn" class="text-[10px] font-medium px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">En línea</span>
+        <button onclick="toggleSound()" class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center"><i id="snd" class="fa-solid fa-volume-high text-sky-300 text-xs"></i></button>
+      </div>
+    </div>
+  </header>
+
+  <div id="banner" class="absolute top-2 inset-x-3 z-30 pointer-events-none"></div>
+  <main id="view" class="flex-1 overflow-y-auto p-4"></main>
+
+  <nav class="shrink-0 bg-white border-t border-slate-200 flex pb-[env(safe-area-inset-bottom)]">
+    <button data-tab="notif" onclick="setTab('notif')" class="tab flex-1 py-2.5 flex flex-col items-center gap-1 text-[10px] font-semibold relative"><i class="fa-solid fa-bell text-base"></i>Notificaciones<span id="unread" class="hidden absolute top-1.5 left-1/2 ml-2 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] items-center justify-center"></span></button>
+    <button data-tab="asist" onclick="setTab('asist')" class="tab flex-1 py-2.5 flex flex-col items-center gap-1 text-[10px] font-semibold"><i class="fa-solid fa-calendar-check text-base"></i>Asistencias</button>
+    <button data-tab="inst" onclick="setTab('inst')" class="tab flex-1 py-2.5 flex flex-col items-center gap-1 text-[10px] font-semibold"><i class="fa-solid fa-building-columns text-base"></i>Institución</button>
+  </nav>
+</div>
+
+<script>
+// Mismas claves y canal que simulador_reloj_SICAE.html
+const K_EV='sicae_attendance_events_v1', K_ST='sicae_students_state_v1', CH='sicae_biometric_network_v1', K_LINK='sicae_parent_linked_v1';
+let students=[], events=[], linked=null, tab='notif', unread=0, lastSeen=null, sound=true, ctx=null;
+
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const get=k=>{try{const r=localStorage.getItem(k);return r?JSON.parse(r):null}catch(e){return null}};
+const set=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+
+function load(){
+  const s=get(K_ST); if(Array.isArray(s)) students=s;
+  const e=get(K_EV); if(Array.isArray(e)) events=e;
+  linked=get(K_LINK);
+}
+const myEvents=()=>events.filter(e=>linked&&linked.includes(e.studentId));
+const myStudents=()=>students.filter(s=>linked&&linked.includes(s.id));
+
+// ---------- Sonido, vibración y notificación del sistema ----------
+function beep(entry){
+  if(!sound) return;
+  try{
+    const A=window.AudioContext||window.webkitAudioContext; if(!A) return;
+    ctx=ctx||new A(); if(ctx.state==='suspended') ctx.resume();
+    const t=ctx.currentTime;
+    (entry?[587.33,880,1174.66]:[880,659.25,523.25]).forEach((f,i)=>{
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.type='triangle';o.frequency.value=f;
+      g.gain.setValueAtTime(.14,t+i*.09);g.gain.exponentialRampToValueAtTime(.001,t+i*.09+.22);
+      o.connect(g);g.connect(ctx.destination);o.start(t+i*.09);o.stop(t+i*.09+.22);
+    });
+  }catch(e){}
+}
+function toggleSound(){sound=!sound;document.getElementById('snd').className='fa-solid '+(sound?'fa-volume-high text-sky-300':'fa-volume-xmark text-slate-400')+' text-xs'}
+function askPerm(){ if('Notification' in window) Notification.requestPermission().then(render) }
+
+function notify(ev){
+  const entry=ev.eventType==='ENTRADA';
+  const title=entry?'✅ Ingreso registrado':'🚪 Salida registrada';
+  const body=`${ev.studentName} marcó su ${ev.eventType.toLowerCase()} a las ${ev.timeFormatted} en ${ev.centerName||'el centro educativo'}.`;
+  beep(entry);
+  try{navigator.vibrate&&navigator.vibrate([200,80,200])}catch(e){}
+  try{ if('Notification' in window&&Notification.permission==='granted') new Notification(title,{body,tag:ev.id}) }catch(e){}
+  document.getElementById('banner').innerHTML=`
+    <div class="banner bg-white/95 backdrop-blur border ${entry?'border-emerald-300':'border-sky-300'} shadow-xl rounded-2xl p-3.5">
+      <div class="flex justify-between text-[10px] font-semibold mb-1">
+        <span class="${entry?'text-emerald-700':'text-sky-700'}"><i class="fa-solid fa-fingerprint mr-1"></i>S.I.C.A.E. PARENT CONNECT • AHORA</span>
+        <span class="fm text-slate-400">${esc(ev.timeFormatted)}</span></div>
+      <div class="text-xs fd font-bold text-slate-900">${title}</div>
+      <p class="text-[11px] text-slate-600 mt-0.5 leading-snug">${esc(body)}</p>
+    </div>`;
+}
+
+// ---------- Recepción desde el reloj biométrico ----------
+function incoming(explicit){
+  load();
+  const newest=explicit||events[0];
+  if(newest&&newest.id!==lastSeen){
+    lastSeen=newest.id;
+    if(linked&&linked.includes(newest.studentId)){
+      notify(newest);
+      if(tab!=='notif'){unread++}
+    }
+  }
+  render();
+}
+let bc=null;
+try{ if('BroadcastChannel' in window){ bc=new BroadcastChannel(CH); bc.onmessage=m=>{ if(m.data&&m.data.type==='STATE_UPDATED') incoming(m.data.event||null) } } }catch(e){}
+window.addEventListener('storage',e=>{ if(e.key===K_EV||e.key===K_ST) incoming() });
+
+// ---------- Vinculación ----------
+function saveLinks(){
+  const ids=[...document.querySelectorAll('.lk:checked')].map(c=>c.value);
+  if(!ids.length) return;
+  linked=ids; set(K_LINK,ids); tab='notif'; render();
+}
+function relink(){linked=null;render()}
+
+// ---------- Prueba local (equivale al botón del simulador original) ----------
+function testScan(){
+  load(); const stu=myStudents()[0]; if(!stu) return;
+  const now=new Date(), type=stu.status==='INSIDE'?'SALIDA':'ENTRADA';
+  stu.status=type==='ENTRADA'?'INSIDE':'OUTSIDE';
+  stu.lastTimestamp=`${type} ${now.toLocaleTimeString('es-UY',{hour:'2-digit',minute:'2-digit',hour12:false})}`;
+  const ev={id:'EVT-'+Date.now(),studentId:stu.id,studentName:stu.name,studentInitials:stu.initials,studentGroup:stu.group,
+    parentName:stu.parentName,parentPhone:stu.parentPhone,relationship:stu.relationship,eventType:type,
+    timeFormatted:now.toLocaleTimeString('es-UY',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}),
+    dateFormatted:now.toLocaleDateString('es-UY',{day:'2-digit',month:'2-digit',year:'numeric'}),timestamp:now.getTime(),
+    deviceNode:'Prueba local (app)',centerName:'Escuela Técnica Las Piedras 2 (ANEP - UTU)',biometricHash:'0xTEST...LOCAL'};
+  events.unshift(ev); set(K_ST,students); set(K_EV,events);
+  try{bc&&bc.postMessage({type:'STATE_UPDATED',event:ev,timestamp:Date.now()})}catch(e){}
+  incoming(ev);
+}
+
+// ---------- Vistas ----------
+function setTab(t){tab=t;if(t==='notif')unread=0;render()}
+
+const pill=(inside)=>`<span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${inside?'bg-emerald-100 text-emerald-800 border border-emerald-200':'bg-slate-100 text-slate-600 border border-slate-200'}">${inside?'● En el centro':'○ Fuera del centro'}</span>`;
+const card=(s)=>`<div class="bg-white border ${s.status==='INSIDE'?'border-emerald-200':'border-slate-200'} rounded-2xl p-3.5 shadow-sm flex items-center justify-between gap-2">
+  <div class="flex items-center gap-2.5 min-w-0">
+    <div class="w-10 h-10 rounded-xl ${s.status==='INSIDE'?'bg-emerald-600 text-white':'bg-slate-200 text-slate-700'} fd font-bold text-xs flex items-center justify-center shrink-0">${esc(s.initials)}</div>
+    <div class="min-w-0"><div class="text-xs font-bold text-slate-900 truncate">${esc(s.name)}</div><div class="text-[11px] text-slate-500 truncate">${esc(s.group||'')}</div></div>
+  </div>
+  <div class="text-right shrink-0">${pill(s.status==='INSIDE')}<div class="text-[10px] text-slate-400 mt-1">${esc(s.lastTimestamp||'Sin marcas hoy')}</div></div></div>`;
+
+function viewLink(){
+  if(!students.length) return `<div class="text-center py-16 px-4">
+    <i class="fa-solid fa-link-slash text-3xl text-slate-400 mb-3"></i>
+    <div class="fd font-bold text-slate-800 text-sm">Esperando al reloj biométrico</div>
+    <p class="text-xs text-slate-500 mt-2 leading-relaxed">Abre <strong>simulador_reloj_SICAE.html</strong> en este mismo navegador (mismo origen) para que comparta la lista de estudiantes.</p></div>`;
+  return `<div class="fd font-bold text-slate-900 text-base">Vincular estudiantes</div>
+    <p class="text-xs text-slate-500 mt-1 mb-4">Selecciona a quién representas como padre, madre o tutor. Solo recibirás avisos de ellos.</p>
+    <div class="space-y-2">${students.map(s=>`<label class="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl p-3 cursor-pointer">
+      <input type="checkbox" class="lk w-4 h-4 accent-sky-600" value="${esc(s.id)}" ${linked&&linked.includes(s.id)?'checked':''}>
+      <div class="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 fd font-bold text-xs flex items-center justify-center">${esc(s.initials)}</div>
+      <div class="min-w-0"><div class="text-xs font-bold text-slate-900 truncate">${esc(s.name)}</div><div class="text-[11px] text-slate-500 truncate">Tutor: ${esc(s.parentName)}</div></div></label>`).join('')}</div>
+    <button onclick="saveLinks()" class="mt-4 w-full py-3 rounded-2xl bg-[#0a2540] text-white text-xs font-semibold">Continuar</button>`;
+}
+
+function viewNotif(){
+  const ev=myEvents(), perm='Notification' in window?Notification.permission:'unsupported';
+  let h='';
+  if(perm==='default') h+=`<button onclick="askPerm()" class="w-full mb-3 p-3 rounded-2xl bg-sky-50 border border-sky-200 text-left flex items-center gap-3">
+    <i class="fa-solid fa-bell text-sky-600"></i><span class="text-[11px] text-sky-900"><strong>Activar avisos del sistema.</strong> Recibe la alerta aunque la app esté en segundo plano.</span></button>`;
+  h+=`<div class="space-y-2 mb-4">${myStudents().map(card).join('')}</div>
+    <div class="flex items-center justify-between mb-2"><span class="text-xs fd font-bold text-slate-800"><i class="fa-solid fa-bell text-sky-600 mr-1"></i>Avisos recibidos</span>
+    <span class="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">${ev.length} avisos</span></div>`;
+  if(!ev.length) return h+`<div class="text-center py-10 px-4 bg-white rounded-2xl border border-dashed border-slate-200">
+    <i class="fa-regular fa-bell text-2xl text-slate-400 mb-2 block"></i><div class="text-xs font-bold text-slate-700">Sin notificaciones recientes</div>
+    <p class="text-[11px] text-slate-500 mt-1">Cuando el estudiante apoye su huella en el reloj, recibirás aquí el aviso.</p></div>`;
+  return h+`<div class="space-y-2.5">${ev.map((e,i)=>{const en=e.eventType==='ENTRADA';return `
+    <div class="${i===0?'flash':''} p-3.5 rounded-2xl bg-white border ${en?'border-emerald-200':'border-sky-200'} shadow-sm">
+      <div class="flex justify-between text-[10px] font-semibold mb-1">
+        <span class="${en?'text-emerald-700':'text-sky-700'}"><i class="fa-solid ${en?'fa-right-to-bracket':'fa-right-from-bracket'} mr-1"></i>AVISO DE ${esc(e.eventType)}</span>
+        <span class="fm font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">${esc(e.timeFormatted)}</span></div>
+      <div class="text-xs font-bold text-slate-900">${esc(e.studentName)}</div>
+      <p class="text-[11px] text-slate-600 mt-1 leading-relaxed">Estimado/a <strong>${esc(e.parentName)}</strong>: el estudiante registró su <strong>${esc(e.eventType.toLowerCase())}</strong> mediante huella dactilar en <strong>UTU Las Piedras 2</strong> a las <strong>${esc(e.timeFormatted)}</strong>.</p>
+      <div class="mt-2 pt-2 border-t border-slate-100 flex justify-between text-[10px] text-slate-400">
+        <span><i class="fa-solid fa-fingerprint text-sky-600 mr-1"></i>${esc(e.deviceNode||'Hub K14')}</span>
+        <span class="text-emerald-600 font-medium"><i class="fa-solid fa-check-double mr-1"></i>Verificado</span></div></div>`}).join('')}</div>`;
+}
+
+function viewAsist(){
+  const ev=myEvents(); const inside=myStudents().filter(s=>s.status==='INSIDE').length;
+  let h=`<div class="grid grid-cols-2 gap-3 mb-4">
+    <div class="bg-white border border-slate-200 rounded-2xl p-3"><div class="text-[11px] text-slate-500 font-semibold">En el centro</div><div class="fd text-2xl font-extrabold">${inside}<span class="text-sm text-slate-400">/${myStudents().length}</span></div></div>
+    <div class="bg-white border border-slate-200 rounded-2xl p-3"><div class="text-[11px] text-slate-500 font-semibold">Marcas registradas</div><div class="fd text-2xl font-extrabold">${ev.length}</div></div></div>
+    <div class="text-xs fd font-bold text-slate-800 mb-2"><i class="fa-solid fa-clock-rotate-left text-emerald-600 mr-1"></i>Comprobantes de entrada y salida</div>`;
+  if(!ev.length) return h+`<div class="py-8 text-center text-slate-400 text-xs">Sin registros todavía.</div>`;
+  const days={}; ev.forEach(e=>(days[e.dateFormatted]=days[e.dateFormatted]||[]).push(e));
+  return h+Object.keys(days).map(d=>`<div class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-3 mb-1.5">${esc(d)}</div><div class="space-y-2">`+
+    days[d].map(e=>{const en=e.eventType==='ENTRADA';return `<div class="p-3 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5 min-w-0"><div class="w-9 h-9 rounded-xl ${en?'bg-emerald-100 text-emerald-700':'bg-sky-100 text-sky-700'} flex items-center justify-center shrink-0"><i class="fa-solid ${en?'fa-right-to-bracket':'fa-right-from-bracket'}"></i></div>
+      <div class="min-w-0"><div class="text-xs font-bold text-slate-900 truncate">${esc(e.studentName)}</div>
+      <div class="text-[10px] fm text-slate-400 truncate">${esc(e.eventType)} • ${esc(e.biometricHash)}</div></div></div>
+      <div class="fm text-sm font-bold text-slate-900">${esc(e.timeFormatted)}</div></div>`}).join('')+`</div>`).join('');
+}
+
+function viewInst(){
+  const perm='Notification' in window?Notification.permission:'no disponible';
+  return `<div class="bg-white border border-slate-200 rounded-2xl p-4 mb-3">
+      <div class="flex items-center gap-3"><div class="w-11 h-11 rounded-xl bg-[#0a2540] text-sky-300 flex items-center justify-center"><i class="fa-solid fa-building-columns"></i></div>
+      <div><div class="fd font-bold text-sm text-slate-900">Escuela Técnica Las Piedras 2</div><div class="text-[11px] text-slate-500">ANEP – UTU • Control de acceso biométrico</div></div></div>
+      <div class="mt-3 text-[11px] text-slate-600 space-y-1"><div><i class="fa-solid fa-fingerprint w-4 text-sky-600"></i> Hub biométrico ZKTeco K14 (acceso principal)</div>
+      <div><i class="fa-solid fa-bolt w-4 text-amber-500"></i> Avisos inmediatos de ingreso y salida</div></div></div>
+    <div class="bg-white border border-slate-200 rounded-2xl p-4 mb-3">
+      <div class="text-xs fd font-bold text-slate-800 mb-2">Mis estudiantes vinculados</div>
+      <div class="text-[11px] text-slate-600 mb-3">${myStudents().map(s=>esc(s.name)).join(', ')||'—'}</div>
+      <button onclick="relink()" class="w-full py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700">Cambiar vinculación</button></div>
+    <div class="bg-white border border-slate-200 rounded-2xl p-4 mb-3">
+      <div class="text-xs fd font-bold text-slate-800 mb-1">Notificaciones del sistema</div>
+      <div class="text-[11px] text-slate-500 mb-3">Estado: <strong>${esc(perm)}</strong></div>
+      ${perm==='default'?`<button onclick="askPerm()" class="w-full py-2.5 rounded-xl bg-sky-600 text-white text-xs font-semibold">Activar notificaciones</button>`:''}
+      ${perm==='denied'?`<p class="text-[11px] text-rose-600">Bloqueadas: actívalas desde los ajustes del navegador.</p>`:''}</div>
+    <button onclick="testScan()" class="w-full py-3 rounded-2xl bg-[#0a2540] text-white text-xs font-semibold">`;
+}
+
+function render(){
+  document.querySelectorAll('.tab').forEach(b=>{const on=b.dataset.tab===tab&&linked;b.className=b.className.replace(/text-\S+/g,'')+' '+(on?'text-sky-700':'text-slate-400')});
+  const u=document.getElementById('unread'); u.textContent=unread; u.classList.toggle('hidden',!unread); u.classList.toggle('flex',!!unread);
+  const v=document.getElementById('view');
+  v.innerHTML=!linked?viewLink():tab==='notif'?viewNotif():tab==='asist'?viewAsist():viewInst();
+}
+
+window.addEventListener('DOMContentLoaded',()=>{ load(); if(events[0]) lastSeen=events[0].id; render(); });
+</script>
+</body>
+</html>
